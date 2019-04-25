@@ -1,0 +1,25 @@
+{% extends "layout.html" %} {% block body %}
+<h2>Prediction took {{ length }} steps</h2>
+<div class="container">
+	<div class="row">
+		{% for i in range(length) %}
+		<div class="card card-default col-sm" style="margin:12px">
+			<div class="card-body" style="text-align:center">
+				<img
+					src="/image/{{ filename }}{{ i }}.jpg"
+					alt="image for step {{ i + 1 }}"
+					style="width: 200px;"
+				/>
+				{% if y[i] == 10%} rotate anticlockwise {% elif y[i] == 11%} rotate
+				clockwise {% elif y[i] == 12 or y[i] == 13 %} flip {%endif%}
+			</div>
+		</div>
+		{%endfor%}
+	</div>
+</div>
+<div class="card card-default" style="margin:12px">
+	<div class="card-body" style="text-align:center">
+		<h3>The number predicted is {{ y[-1] }}</h3>
+	</div>
+</div>
+{% endblock %}

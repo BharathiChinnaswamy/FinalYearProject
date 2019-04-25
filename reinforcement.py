@@ -1,30 +1,35 @@
+import matplotlib.pyplot as plt
 from keras.datasets import mnist
 import random
 import gym
 import math
+import os
 import numpy as np
 from collections import deque
 from keras.models import Sequential
 from keras.layers import Dense, Conv2D, Flatten, BatchNormalization, Dropout, MaxPooling2D, Activation
 from keras.optimizers import Adam
 from copy import deepcopy
+from PIL import Image
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
 np.set_printoptions(precision=2)
 
+
 class Environment:
     def __init__(self, X, Y):
-        self.X = X # Input dataset
-        self.Y = Y # Labels for the images
-        self.x = None # image with tranformations for current sessions
-        self.y = None # correct class label for image in currect session
-        self.max_depth = 12 # The max number of transformations that can be done
-        self.memory = [] # Memory for storing images after each transformation
+        self.X = X  # Input dataset
+        self.Y = Y  # Labels for the images
+        self.x = None  # image with tranformations for current sessions
+        self.y = None  # correct class label for image in currect session
+        self.max_depth = 12  # The max number of transformations that can be done
+        self.memory = []  # Memory for storing images after each transformation
         self.n_stop_actions = 10
-        self.n_actions = self.n_stop_actions + 2 + 2 # number of stop actions , 2 rotate actions and 2 flip actions
+        # number of stop actions , 2 rotate actions and 2 flip actions
+        self.n_actions = self.n_stop_actions + 2 + 2
 
     def step(self, action):
-        if action >= self.n_actions or action < 0: # Invalid Action
+        if action >= self.n_actions or action < 0:  # Invalid Action
             return
         done = False
         reward = 0
@@ -32,34 +37,36 @@ class Environment:
         # as true and reset memory , else append the old memory
         if len(self.memory) + 1 == self.max_depth:
             done = True
-            reward= -0.1
+            reward = -0.1
         if action < self.n_stop_actions:
             done = True
-            if action == self.y: # if the prediction is correct then set reward as n_stop_actions - 1
+            if action == self.y:  # if the prediction is correct then set reward as n_stop_actions - 1
                 reward = self.n_stop_actions - 1
             else:
                 reward = -1
             return self.x, reward, done, {}
-        if not done: # Else add the image to the memory
+        if not done:  # Else add the image to the memory
             self.memory.append(self.x)
-        if action == 10: # If the action is 10, rotate the image by 90 degrees anti-clockwise
+        if action == 10:  # If the action is 10, rotate the image by 90 degrees anti-clockwise
             self.x = np.rot90(self.x, 1)
-        elif action == 11: # If the action is 11, rotate the image by 90 degrees clockwise
+        elif action == 11:  # If the action is 11, rotate the image by 90 degrees clockwise
             self.x = np.rot90(self.x, 3)
-        elif action == 12: # If the action is 12, horizontally flip the image
+        elif action == 12:  # If the action is 12, horizontally flip the image
             self.x = np.flip(self.x, 1)
-        elif action == 13: # If the action is 13, vertically flip the image
+        elif action == 13:  # If the action is 13, vertically flip the image
             self.x = np.flip(self.x, 0)
         return self.x, reward, done, {}
 
     def reset(self):
-        index = np.random.randint(len(self.X)) # get a random image for the session
-        self.x = deepcopy(self.X[index]) # set x as the image from index
-        self.y = deepcopy(self.Y[index]) # set the label for image in y
-        #clear memory
-        del self.memory 
+        # get a random image for the session
+        index = np.random.randint(len(self.X))
+        self.x = deepcopy(self.X[index])  # set x as the image from index
+        self.y = deepcopy(self.Y[index])  # set the label for image in y
+        # clear memory
+        del self.memory
         self.memory = []
-        return self.x #return initial image
+        return self.x  # return initial image
+
 
 class DQNCartPoleSolver():
     def __init__(self, n_episodes=1500, gamma=1.0, epsilon=0.99, epsilon_min=0.01, epsilon_log_decay=0.996, batch_size=64):
@@ -127,17 +134,17 @@ class DQNCartPoleSolver():
                 # self.env.render()
                 action, confidence = self.choose_action(
                     state, self.get_epsilon(e))
-                next_state, reward, done, _ = self.env.step(action, confidence)
+                next_state, reward, done, _ = self.env.step(action)
                 next_state = self.preprocess_state(next_state)
                 self.remember(state, action, reward, next_state, done)
                 state = next_state
                 if done and reward == 9:
                     correct += 1
-            if e%20 == 0 and e!=0:
-              totalCorrect += correct
-              print(
-                  '[Episode {}] - correct: {}, accuracy: {}, epsilon: {}.'.format(e, correct, totalCorrect/e, self.epsilon))
-              correct=0
+            if e % 20 == 0 and e != 0:
+                totalCorrect += correct
+                print(
+                    '[Episode {}] - correct: {}, accuracy: {}, epsilon: {}.'.format(e, correct, totalCorrect/e, self.epsilon))
+                correct = 0
             self.replay(self.batch_size)
         return e
 
@@ -149,7 +156,7 @@ class DQNCartPoleSolver():
             while not done:
                 # self.env.render()
                 action = self.choose_action(state, 0)
-                next_state, _, done, _ = self.env.step(action, 1.0)
+                next_state, _, done, _ = self.env.step(action)
                 state = self.preprocess_state(next_state)
                 step += 1
             print("number of steps in episode {} is {}".format(episode_num, step))
@@ -160,30 +167,57 @@ class DQNCartPoleSolver():
     def load_weights(self, filename):
         self.model.load_weights(filename)
 
-from google.colab import drive
-agent = DQNCartPoleSolver(n_episodes=1000)  
-drive.mount('/content/drive')
+
+# from google.colab import drive
+agent = DQNCartPoleSolver(n_episodes=1000)
+# drive.mount('/content/drive')
 agent.model.load_weights("./mnist_reinforcement.h5f")
 
-def predict(x):
-	np.argmax(agent.model.predict(x.reshape(1,28,28,1)))
 
-import matplotlib.pyplot as plt
-selected = 5073
-selected_x = x_test[selected]
-selected_y_dash = np.argmax(agent.model.predict(x_test[selected].reshape(1,-1,-1,1)))
-selected_y_dash
-plt.imshow(x_test[selected])
-plt.show()
-if selected_y_dash == 10:
-  selected_x = np.rot90(selected_x, 1)
-elif selected_y_dash == 11:
-  selected_x = np.rot90(selected_x, 3)
-elif selected_y_dash == 12:
-  selected_x = np.flip(selected_x, 1)
-elif selected_y_dash == 13:
-  selected_x = np.flip(selected_x, 0)
-plt.imshow(selected_x)
-plt.show()
-selected_y_dash = np.argmax(agent.model.predict(selected_x.reshape(1,28,28,1)))
-print(selected_y_dash)
+def load_image(filename):
+    img = Image.open(filename)
+    img.load()
+    data = np.asarray(img, dtype="int32")
+    return data
+
+
+def save_image(data, filename):
+    img = Image.fromarray(np.asarray(
+        np.clip(data, 0, 255), dtype="uint8"), "L")
+    img.save(filename)
+
+
+def predict(filename):
+    x = load_image(filename)
+    i = 0
+    save_name = ".".join(filename.split("/")[-1].split(".")[:-1])
+    save_image(x, os.path.join("preprocess", save_name+str(i)+".jpg"))
+    preprocessed_x = np.array([x[..., np.newaxis]])
+    y = np.argmax(agent.model.predict(preprocessed_x))
+    y_all = []
+    y_all.append(y)
+    while y >= 10:
+        if y == 10:
+            x = np.rot90(x, 1)
+        elif y == 11:
+            x = np.rot90(x, 3)
+        elif y == 12:
+            x = np.flip(x, 1)
+        elif y == 13:
+            x = np.flip(x, 0)
+        i += 1
+        save_image(x, os.path.join("preprocess", save_name+str(i)+".jpg"))
+        preprocessed_x = np.array([x[..., np.newaxis]])
+        y = np.argmax(agent.model.predict(preprocessed_x))
+        y_all.append(y)
+    return y_all
+
+
+def pred(x):
+    preprocessed_x = np.array([x[..., np.newaxis]])
+    return np.argmax(agent.model.predict(preprocessed_x))
+
+
+for i in range(10, 20):
+    save_image(x_test[i], str(i)+"1.jpg")
+print(predict("101.jpg"))
